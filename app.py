@@ -2,12 +2,13 @@ import sys
 from flask import Flask,request,jsonify
 import json
 from datetime import datetime
+import os
 
 
 local_model_path = "best.pt"
-app = Flask(__name__)
+#app = Flask(__name__)
 
-
+folder_path = 'D:/backup/importantes/pythoncodigos/projeto_bolt_bolsa2/MLSpikeDetector/DATA/META'
 def error_line(message):
     print(f'❌❌❌❌❌❌')
     print(message)
@@ -68,7 +69,25 @@ def get_val(val,request_json,request_args):
             x = val
         return x
 
-@app.route("/predict", methods = ['GET'])
+def deleting_files(folder_path):
+    if not os.path.exists(folder_path):
+        print(f"A pasta '{folder_path}' não existe.")
+        return
+
+    try:
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                    print(f"Arquivo   deletado: {file_path}")
+                except OSError as e:
+                    print(f"Erro ao deletar '{file_path}': {e}")
+    except OSError as e:
+        print(f"Erro ao acessar a pasta '{folder_path}': {e}")
+
+#@app.route("/predict", methods = ['GET'])
+
 def read_prediction():
     """
     This function reads the prediction from data.json and returns the prediction as a response
@@ -83,12 +102,12 @@ def read_prediction():
         prediction = get_prediction_status(file_path)
         print("The prediction is ",prediction)
         if prediction is not None:
-            # Return the prediction as a JSON response
+            
             return jsonify(prediction)
+            
         else:
             # If prediction is None, return an appropriate error response
-            return jsonify({"error": f'An error occurred'})
-        
+            return jsonify({"error": f'An error occurred'})  
 
     except Exception as e:
         error_line(e)
@@ -96,9 +115,28 @@ def read_prediction():
         # If an exception occurs, return an appropriate error response
         return jsonify({"error": f'An error occurred : {e}'})
 
+#options menu
 
-if __name__ == '__main__':
+while True:
+    option = input('0 - EXIT\n\n'
+                   '1 - Start Forecast\n\n'
+                   '2 - UPDATE DATABASE\n\n'
+                   '3 - CREATE DATABASE\n\n'
+                   
+                   'OPTION: ')
+    match option:
+        case '0':
+            deleting_files(folder_path)
+            print('EXITING THE PROGRAM...')
+            exit()
+        case '1':
+            sticker = input('Enter the name of the sticker: ')
+            time = input(int('What is the timeframe? Ex.: 1, 5, 15'))
+            time2 = input(str('Minutes or Hours?'))
+        case _:
+            print('INVALID OPTION!')
 
-    app.run(debug=True)
 
+# if __name__ == '__main__':
 
+#     app.run(debug=True)

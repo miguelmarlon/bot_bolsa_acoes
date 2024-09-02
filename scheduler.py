@@ -12,7 +12,6 @@ from datetime import datetime,timedelta
 import numpy as np
 from ultralyticsplus import YOLO,render_result
 
-# symbol='Crash 1000 Index'
 bars = 300
 images_folder_for_symbol=f'LIVEDATA'
 local_model_path = "best.pt"
@@ -36,7 +35,6 @@ def load_model(model_path):
         return model
     except Exception as e:
         error_line(e)
-
 
 
 def error_line(message):
@@ -121,13 +119,27 @@ def get_prediction(model,df,bars,images_folder=images_folder_for_symbol):
         cv2.imwrite(output_path, render_np)
         # Increment counters
         start_candle, end_candle = start_candle + 1, end_candle + 1
+        
+        up = 0
+        down = 0
+        
+        for pred in current_preds:
+            if pred == 'up':
+                up +=1
+            else:
+                down +=1
 
-        return current_preds[0]
+            if up == down:
+                forecast = current_preds[0]
+            elif up > down:
+                forecast = 'up'
+            else:
+                forecast = 'down'
+          
+        return forecast
     except Exception as e:
         print("get_prediction")
         error_line(e)
-
-
 
 def get_data(symbol):
     """
@@ -142,8 +154,7 @@ def get_data(symbol):
    
     except Exception as e:
         print("get_data")
-        error_line(e) 
-
+        error_line(e)
 
 
 def update_json_file(prediction):
@@ -169,7 +180,6 @@ def update_json_file(prediction):
     except Exception as e:
          print("update_json_file")
          error_line(e) 
-
 
 
 def make_prediction():
@@ -226,7 +236,6 @@ if __name__ == "__main__":
 
     if str(sys.argv[3]) == 'week':
        time_schedule = int(sys.argv[2])* 60 * 7 * 60 * 60
-    
     
     
     symbol = str(sys.argv[-1])
