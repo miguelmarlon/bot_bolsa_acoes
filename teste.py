@@ -6,6 +6,9 @@ import joblib
 from sklearn.model_selection import cross_val_score
 import pandas as pd
 import numpy as np
+import MetaTrader5 as mt5
+from sklearn.preprocessing import MinMaxScaler
+import joblib
 
 folder_path = 'D:/backup/importantes/pythoncodigos/projeto_bolt_bolsa2/MLSpikeDetector/DATA/META'
 
@@ -51,18 +54,73 @@ while True:
             symbol = input('Enter the name of the sticker: \n')
             df = get_data(symbol)
             df['time'] = pd.to_datetime(df['time'], unit='s')
-            print(df)
-            x_alvo = df.loc[:, ['open', 'close']].to_numpy()
-            #x_alvo = df.iloc[-1].values
-            #print(x_alvo)
+            df['target'] = df[['close']].shift(-1)
+            df = df.drop('spread', axis=1)
+            df = df.drop('high', axis=1)
+            df = df.drop('tick_volume', axis=1)
+            df = df.drop('low', axis=1)
+            sc = MinMaxScaler(feature_range= (0,1))
+            scaled_df = sc.fit_transform(df.drop(columns='time'))
+
+            #x_alvo = df.loc[:, ['open', 'close']].to_numpy()
+            x_alvo = scaled_df[:, :2]
             X_alvo = x_alvo[-1]
-            #print(X_alvo)
             X_alvo = X_alvo.reshape(1, -1)
             X_alvo = X_alvo[:, ~np.isnan(X_alvo).any(axis=0)]
+            df = df.dropna()
+                       
+            # print(scaled_df)
+            # print('--------------')
+            # print(F'X ALVO {X_alvo}')
+            X = scaled_df[:, :2]
+            y = scaled_df[:, 2:]
 
-            #X =df[['open', 'high', 'low', 'close']].values
-            X = df[['open', 'close']].values
-            y = df['close'].values
+            split = int(0.7 * (len(X)))
+            X_train = X[:split]
+            y_train = y[:split]
+            X_test = X[split:]
+            y_test = y[split:]
+
+            model_carregado = joblib.load('modelo_ridge.pkl')
+
+            
+            predicted_price = model_carregado.predict(X_alvo)
+
+            # model = Ridge(alpha=0.01)
+            # model.fit(X_train, y_train)
+            # predicted_price = model.predict(X_alvo)
+            #print(F'PREVISAO {predicted_price}')
+            valorizacao = (predicted_price[0,1] - X_alvo[0,1]) / X_alvo[0,1]
+            valorizacao *= 100
+
+            # scores = cross_val_score(model, X, y, cv=5, scoring='r2')
+            # scor = scores.mean()
+            # print(f'Taxa de acerto: {scor}')
+            print(f'Valorização prevista em %: {valorizacao}' )
+        
+        case '3':
+            time = '2024-08-30'
+            mt5.initialize()
+            date_from = pd.Timestamp(time)
+            rates = mt5.copy_rates_from('ETHUSD', mt5.TIMEFRAME_M1, date_from, 3000)
+            if rates is not None:
+                
+                df = pd.DataFrame(rates)
+                df['time'] = pd.to_datetime(df['time'], unit='s')
+
+            target_df = df
+            target_df['target'] = df[['close']].shift(-1)
+            target_df = target_df.drop('spread', axis=1)
+            target_df = target_df.drop('high', axis=1)
+            target_df = target_df.drop('tick_volume', axis=1)
+            target_df = target_df.drop('low', axis=1)
+            target_df = target_df.dropna()
+
+            sc = MinMaxScaler(feature_range= (0,1))
+            scaled_df = sc.fit_transform(target_df.drop(columns='time'))
+            
+            X = scaled_df[:, :2]
+            y = scaled_df[:, 2:]
 
             split = int(0.7 * (len(X)))
             X_train = X[:split]
@@ -72,14 +130,11 @@ while True:
 
             model = Ridge(alpha=0.01)
             model.fit(X_train, y_train)
-            predicted_price = model.predict(X_alvo)
-
-            valorizacao = (predicted_price - X_alvo[0,0]) / X_alvo[0,0]
-            valorizacao *= 100
-
+            
             scores = cross_val_score(model, X, y, cv=5, scoring='r2')
             scor = scores.mean()
+
+            joblib.dump(model, 'modelo_ridge.pkl')
             print(f'Taxa de acerto: {scor}')
-            print(f'Valorização prevista em %: {valorizacao}' )
         case _:
             print('INVALID OPTION!')

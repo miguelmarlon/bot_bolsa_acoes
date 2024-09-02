@@ -135,12 +135,11 @@ def get_prediction(model,df,bars,images_folder=images_folder_for_symbol):
                 forecast = 'up'
             else:
                 forecast = 'down'
-            
+          
         return forecast
     except Exception as e:
         print("get_prediction")
         error_line(e)
-
 
 def get_data(symbol):
     """
