@@ -11,15 +11,19 @@ import cv2
 from datetime import datetime,timedelta
 import numpy as np
 from ultralyticsplus import YOLO,render_result
+from sklearn.linear_model import Ridge
+from sklearn.preprocessing import MinMaxScaler
+import joblib
 
 bars = 300
 images_folder_for_symbol=f'LIVEDATA'
-local_model_path = "best.pt"
+local_model_path_yolov = "best.pt"
+local_model_path_ridge = "modelo_ridge.pkl"
 symbol =''
 time_schedule = 0
 file_path = ''
 scheduler = sched.scheduler(time.time, time.sleep)
-def load_model(model_path):
+def load_model_yolov(model_path):
     """
     Loads the  model for use in our project
     @returns model
@@ -36,13 +40,17 @@ def load_model(model_path):
     except Exception as e:
         error_line(e)
 
+def load_model_ridge():
+
+    model = joblib.load('modelo_ridge.pkl')
+    return model
 
 def error_line(message):
     print(f'❌❌❌❌❌❌')
     print(message)
 
 
-def get_prediction(model,df,bars,images_folder=images_folder_for_symbol):
+def get_prediction(model_yolov, model_ridge,df,bars,images_folder=images_folder_for_symbol):
     """"
     Use the data retreived from the live data, draw the bars on a graph, then save the file to the images folder.
     
@@ -96,17 +104,17 @@ def get_prediction(model,df,bars,images_folder=images_folder_for_symbol):
             cv2.rectangle(graph, (x - candle_width // 2, y_min), (x + candle_width // 2, y_max), color, thickness) 
             x += 1
 
-        results = model.predict(graph, verbose=False)
+        results = model_yolov.predict(graph, verbose=False)
         current_preds = []
         for result in results:
             print("********************************")
             for box in result.boxes:
                 print("********************************")
                 class_id = int(box.data[0][-1])
-                print("Class ",model.names[class_id])
-                current_preds.append(model.names[class_id])
+                print("Class ",model_yolov.names[class_id])
+                current_preds.append(model_yolov.names[class_id])
         print(f'The current boxes for this chart are {current_preds} with the last prediction being {current_preds[0]}')
-        render = render_result(model=model, image=graph, result=results[0])
+        render = render_result(model=model_yolov, image=graph, result=results[0])
         # Assuming 'render' contains the PIL Image returned by render_result
         render_np = np.array(render)  # Convert PIL Image to numpy array
         # Convert RGB to BGR (OpenCV uses BGR color order)
@@ -130,13 +138,32 @@ def get_prediction(model,df,bars,images_folder=images_folder_for_symbol):
                 down +=1
 
             if up == down:
-                forecast = current_preds[0]
+                forecast_yolov = current_preds[0]
             elif up > down:
-                forecast = 'up'
+                forecast_yolov = 'up'
             else:
-                forecast = 'down'
-          
-        return forecast
+                forecast_yolov = 'down'
+        
+        df = df.drop('spread', axis=1)
+        df = df.drop('high', axis=1)
+        df = df.drop('tick_volume', axis=1)
+        df = df.drop('low', axis=1)
+        df = df.drop('time', axis=1)
+        df = df.drop('real_volume', axis=1)
+        sc = MinMaxScaler(feature_range= (0,1))
+        X = sc.fit_transform(df)
+        X = X[-1]
+        X = X.reshape(1, -1)
+        
+        # print("Normalizei os dados")
+        # print (f'DEBUG x {X}')
+        predicted_price = model_ridge.predict(X)
+        # print(f'predicted_price {predicted_price}')
+        predicted_price = (predicted_price[0,1] - X[0,1]) / X[0,1]
+        predicted_price *= 100
+
+        return forecast_yolov, predicted_price    
+               
     except Exception as e:
         print("get_prediction")
         error_line(e)
@@ -190,16 +217,25 @@ def make_prediction():
       
         print("Making prediction")
         authenticate_to_mt5(wamaitha_account,wamaitha_password,wamaitha_server)
-        model = load_model(local_model_path)
+        model_yolov = load_model_yolov(local_model_path_yolov)
+        model_ridge = load_model_ridge()
         df = get_data(symbol)
-        prediction = get_prediction(model,df,bars)
-        print("Prediction is ",prediction)
-        update_json_file(prediction)
- 
+        prediction, predicted_price = get_prediction(model_yolov, model_ridge, df,bars)
+        # print("Prediction is ",prediction)
+        # update_json_file(prediction, predicted_price)
+        
+        if predicted_price > 0 and prediction == 'up':
+            update_json_file(prediction)
+            print(f"Prediction is: {prediction}")
+        elif predicted_price < 0 and prediction == 'down':
+            update_json_file(prediction)
+            print(f"Prediction is: {prediction}")
+        else:
+            print("The script failed to create a reliable prediction")
+
     except Exception as e:
          print("make_prediction")
          error_line(e) 
-
 
 
 def repeat_task():

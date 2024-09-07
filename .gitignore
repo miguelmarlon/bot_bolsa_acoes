@@ -11,3 +11,4 @@ LIVEDATA
 .env
 .venv/
 .gitattributes
+*.pkl

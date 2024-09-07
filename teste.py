@@ -12,6 +12,17 @@ import joblib
 
 folder_path = 'D:/backup/importantes/pythoncodigos/projeto_bolt_bolsa2/MLSpikeDetector/DATA/META'
 
+import os
+
+file_path = 'D:\\backup\\importantes\\pythoncodigos\\projeto_bolt_bolsa2\\scheduler.py'
+
+if os.path.exists(file_path):
+    with open(file_path, 'r') as file:
+        # Faça algo com o arquivo
+        pass
+else:
+    print(f"O arquivo {file_path} não foi encontrado.")
+
 def deleting_files(folder_path):
     if not os.path.exists(folder_path):
         print(f"A pasta '{folder_path}' não existe.")
